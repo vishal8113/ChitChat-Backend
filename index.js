@@ -1,6 +1,8 @@
 require("dotenv").config();
 const express = require("express");
 require("dotenv").config();
+
+const routes = require("./routers/index");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const helmet = require("helmet");
@@ -37,15 +39,17 @@ app.use(
 
 app.use(express.json({ limit: "10kb" }));
 
+app.use("/api/v1", routes);
+
 const limiter = rateLimit({
   max: 2000,
   windowMs: 60 * 60 * 1000,
   message: "Too many requests from this IP, please try again in an hour",
 });
 
-app.use("/api", limiter);
+app.use("/chitchat", limiter);
 
-if (process.env.NODE_ENV === "DEVELOPMENT") {
+if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
 }
 

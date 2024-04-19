@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const otpGenerator = require("otp-generator");
+const nodemailer = require("nodemailer");
 
 const User = require("../models/user");
 
@@ -53,16 +54,46 @@ exports.sendOtp = async (req, res, next) => {
 
   const otp_expiry_time = Date.now() + 10 * 60 * 1000;
 
-  await User.findByIdAndUpdate(userId, {
-    otp: new_otp,
-    otp_expiry_time,
+  const user = await User.findByIdAndUpdate(userId, {
+    otp_expiry_time: otp_expiry_time,
   });
 
-  // send mail to user
+  user.otp = new_otp.toString();
 
-  return res.status(200).json({
-    status: "success",
-    message: "OTP sent successfully",
+  await user.save({ new: true, validateModifiedOnly: true });
+
+  // send mail to user
+  const transporter = nodemailer.createTransport({
+    service: "Gmail",
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_PASS,
+    },
+  });
+
+  const mailOptions = {
+    from: "officialacc080@gmail.com",
+    to: user.email,
+    subject: "Your OTP for Verification",
+    text: `Your OTP for verification is ${new_otp}`,
+  };
+
+  transporter.sendMail(mailOptions, function (error, info) {
+    if (error) {
+      console.log(error);
+
+      return res.status(502).json({
+        status: "error",
+        message: "Failed to Send OTP",
+      });
+    } else {
+      console.log("Email sent: " + info.response);
+
+      return res.status(200).json({
+        status: "success",
+        message: "OTP sent successfully",
+      });
+    }
   });
 };
 
@@ -88,17 +119,25 @@ exports.verifyOtp = async (req, res, next) => {
     });
   }
 
-  if (!(await user.compareOTP(otp, user.otp))) {
+  if (!(await user.CompareOTP(otp, user.otp))) {
     return res.status(403).json({
       status: "error",
       message: "Invalid OTP",
     });
   }
 
+  res.status(200).json({
+    status: "success",
+    message: "OTP verified successfully",
+  });
+
   // OTP is correct
 
   user.verified = true;
   user.otp = undefined;
+  user.otp_expiry_time = undefined;
+
+  await user.save();
 };
 
 exports.login = async (req, res, next) => {
@@ -130,39 +169,62 @@ exports.login = async (req, res, next) => {
 };
 
 exports.forgotPassword = async (req, res, next) => {
-  const { email } = req.body;
-
-  const user = await User.findOne({ email: email });
-
+  const user = await User.findOne({ email: req.body.email });
   if (!user) {
-    return res.status(403).json({
+    return res.status(404).json({
       status: "error",
-      message: "Invalid Email",
+      message: "There is no user with email address.",
     });
   }
 
   // Generate the token
 
   const resetToken = user.createPasswordResetToken();
-
-  const resetUrl = `http:localhost:3000/auth/reset-password/code=${resetToken}`;
-
+  console.log(resetToken);
+  await user.save({ validateBeforeSave: false });
   try {
     // send this resetUrl to user
+    const resetUrl = `http:localhost:3000/auth/reset-password/code=${resetToken}`;
 
-    return res.status(200).json({
-      status: "success",
-      message: "Password reset link sent to your email",
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: "officialacc080@gmail.com",
+      to: user.email,
+      subject: "Request for Password Reset",
+      text: `Password Reset Link for chitchat app is: ${resetUrl}`,
+    };
+
+    transporter.sendMail(mailOptions, function (error, info) {
+      if (error) {
+        console.log(error);
+
+        return res.status(502).json({
+          status: "error",
+          message: "Failed to Send OTP",
+        });
+      } else {
+        console.log("Email sent: " + info.response);
+
+        return res.status(200).json({
+          status: "success",
+          message: "OTP sent successfully",
+        });
+      }
     });
   } catch {
     user.passwordResetToken = undefined;
-    passwordResetExpires = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save({ validateBeforeSave: false });
 
-    await User.save({ validateBeforeSave: false });
-
-    return res.status(500).json({
-      status: "error",
-      message: "Something went wrong",
+    return res.status(503).json({
+      message: "There was an error sending the email. Try again later!",
     });
   }
 };

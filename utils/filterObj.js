@@ -5,3 +5,5 @@ const filterObj = (obj, ...allowedFields) => {
   });
   return newObj;
 };
+
+module.exports = filterObj;

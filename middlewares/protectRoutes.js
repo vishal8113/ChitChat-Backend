@@ -40,10 +40,3 @@ exports.protectRoutes = async (req, res, next) => {
   req.user = valid_user;
   next();
 };
-
-// /follow/userId = ,
-// /like/userId=dskhkhekhscds/postId=bAwlljljbqsckh
-// createpost/jsbaaj
-
-// /register
-// /login

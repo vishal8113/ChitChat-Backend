@@ -1,13 +1,14 @@
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const otpGenerator = require("otp-generator");
-const nodemailer = require("nodemailer");
 
 const User = require("../models/user");
 
 const filterObj = require("../utils/filterObj");
 const crypto = require("crypto");
 
+const sendOtp = require("../Services/MailService/otpMailService");
+const sendPasswordResetEmail = require("../Services/MailService/passwordResetMailService");
 const createToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET);
 };
@@ -63,38 +64,14 @@ exports.sendOtp = async (req, res, next) => {
   await user.save({ new: true, validateModifiedOnly: true });
 
   // send mail to user
-  const transporter = nodemailer.createTransport({
-    service: "Gmail",
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_PASS,
-    },
-  });
-
-  const mailOptions = {
-    from: "officialacc080@gmail.com",
-    to: user.email,
-    subject: "Your OTP for Verification",
-    text: `Your OTP for verification is ${new_otp}`,
-  };
-
-  transporter.sendMail(mailOptions, function (error, info) {
-    if (error) {
-      console.log(error);
-
-      return res.status(502).json({
-        status: "error",
-        message: "Failed to Send OTP",
-      });
-    } else {
-      console.log("Email sent: " + info.response);
-
-      return res.status(200).json({
-        status: "success",
-        message: "OTP sent successfully",
-      });
-    }
-  });
+  try {
+    sendOtp(user.email, new_otp, res);
+  } catch {
+    return res.status(502).json({
+      status: "error",
+      message: "Some Error Occurred",
+    });
+  }
 };
 
 exports.verifyOtp = async (req, res, next) => {
@@ -179,52 +156,21 @@ exports.forgotPassword = async (req, res, next) => {
 
   // Generate the token
 
-  const resetToken = user.createPasswordResetToken();
-  console.log(resetToken);
+  const resetToken = await user.createPasswordResetToken();
+
   await user.save({ validateBeforeSave: false });
+
+  // send this resetUrl to user
+  const resetUrl = `http://localhost:3000/auth/new-password?token=${resetToken}`;
   try {
-    // send this resetUrl to user
-    const resetUrl = `http:localhost:3000/auth/reset-password/code=${resetToken}`;
-
-    const transporter = nodemailer.createTransport({
-      service: "Gmail",
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS,
-      },
-    });
-
-    const mailOptions = {
-      from: "officialacc080@gmail.com",
-      to: user.email,
-      subject: "Request for Password Reset",
-      text: `Password Reset Link for chitchat app is: ${resetUrl}`,
-    };
-
-    transporter.sendMail(mailOptions, function (error, info) {
-      if (error) {
-        console.log(error);
-
-        return res.status(502).json({
-          status: "error",
-          message: "Failed to Send OTP",
-        });
-      } else {
-        console.log("Email sent: " + info.response);
-
-        return res.status(200).json({
-          status: "success",
-          message: "OTP sent successfully",
-        });
-      }
-    });
+    sendPasswordResetEmail(req.body.email, resetUrl, res);
   } catch {
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save({ validateBeforeSave: false });
 
     return res.status(503).json({
-      message: "There was an error sending the email. Try again later!",
+      message: "Some Error Occurred!",
     });
   }
 };

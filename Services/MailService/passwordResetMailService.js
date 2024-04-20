@@ -13,7 +13,7 @@ const sendPasswordResetEmail = (email, resetUrl, res) => {
   const mailOptions = {
     from: "officialacc080@gmail.com",
     to: email,
-    subject: "Your OTP for Verification",
+    subject: "Password Reset Request",
     html: passwordResetTemplate(email, resetUrl),
   };
 

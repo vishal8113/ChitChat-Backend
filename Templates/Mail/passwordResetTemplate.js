@@ -61,6 +61,8 @@ module.exports = (email, resetLink) => {
 
     <div class="reset-link"><a href=${resetLink} target="_blank">Reset Password</a></div>
 
+    <p>This Request is valid for only 10 Minutes due to security reasons. If you did not request this , please ignore it.</p>
+
     <p>If the above link is not clickable, you can copy and paste the following URL into your web browser:</p>
 
     <p>${resetLink}</p>

@@ -29,6 +29,15 @@ const userSchema = new mongoose.Schema(
         message: `Password must be at least 6 characters long`,
       },
     },
+    name: {
+      type: String,
+    },
+    about: {
+      type: String,
+    },
+    imageUrl: {
+      type: String,
+    },
     passwordChangedAt: {
       type: Date,
     },

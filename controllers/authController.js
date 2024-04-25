@@ -3,6 +3,7 @@ require("dotenv").config();
 const otpGenerator = require("otp-generator");
 
 const User = require("../models/user");
+const cloudinary = require("../Services/cloudinaryService");
 
 const filterObj = require("../utils/filterObj");
 const crypto = require("crypto");
@@ -15,7 +16,7 @@ const createToken = (userId) => {
 
 // registration -> 1st step
 exports.register = async (req, res, next) => {
-  const { email, password } = req.body;
+  const { email } = req.body;
 
   const filterBody = filterObj(req.body, "email", "password");
 
@@ -103,18 +104,71 @@ exports.verifyOtp = async (req, res, next) => {
     });
   }
 
-  res.status(200).json({
-    status: "success",
-    message: "OTP verified successfully",
-  });
-
-  // OTP is correct
+  const token = createToken(user._id);
 
   user.verified = true;
   user.otp = undefined;
   user.otp_expiry_time = undefined;
 
   await user.save();
+
+  res.status(200).json({
+    status: "success",
+    message: "OTP verified successfully",
+    token,
+  });
+};
+
+exports.createProfile = async (req, res, next) => {
+  const { name, about, image, email } = req.body;
+
+  try {
+    const user = await User.findOne({ email: email });
+
+    if (!user) {
+      return res.status(403).json({
+        status: "error",
+        message: "Please Register First",
+      });
+    }
+
+    if (image) {
+      const uploadImage = await cloudinary.uploader.upload(image, {
+        folder: "profileImages",
+      });
+
+      if (!uploadImage.secure_url) {
+        return res.status(503).json({
+          status: "error",
+          message: "Failed to upload image,Please try again!!",
+        });
+      }
+      user.imageUrl = uploadImage.secure_url;
+    }
+
+    user.name = name;
+    user.about = about;
+
+    await user.save();
+
+    let url;
+
+    if (user.imageUrl) {
+      url = user.imageUrl;
+    }
+
+    return res.status(200).json({
+      status: "success",
+      message: "Profile Created Successfully",
+      url,
+    });
+  } catch (err) {
+    console.log(err);
+    return res.status(503).json({
+      status: "error",
+      message: "Some Error Occurred",
+    });
+  }
 };
 
 exports.login = async (req, res, next) => {

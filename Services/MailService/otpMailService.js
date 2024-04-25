@@ -23,7 +23,7 @@ const sendOtp = (email, otp, res) => {
 
       return res.status(502).json({
         status: "error",
-        message: "Failed to Send OTP",
+        message: "Failed to Send OTP, Please try again",
       });
     } else {
       console.log("Email sent: " + info.response);

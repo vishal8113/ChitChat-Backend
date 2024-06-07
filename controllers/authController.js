@@ -163,6 +163,7 @@ exports.createProfile = async (req, res, next) => {
       url,
       name,
       about,
+      user_id: user._id,
     });
   } catch (err) {
     console.log(err);
@@ -196,6 +197,11 @@ exports.login = async (req, res, next) => {
 
   const img = await User.findOne({ email: email }).select("+imageUrl");
 
+  const usr1 = await User.findOne({ email: email }).select("+about");
+
+  let name = usr1.name;
+  let about = usr1.about;
+
   let url = img.imageUrl;
 
   return res.status(200).json({
@@ -203,6 +209,10 @@ exports.login = async (req, res, next) => {
     message: "Logged in successfully",
     token,
     url,
+    name,
+    about,
+    email,
+    user_id: user._id,
   });
 };
 

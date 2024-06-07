@@ -1,4 +1,4 @@
-const promisify = require("util");
+const { promisify } = require("util");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
 require("dotenv").config();
@@ -8,7 +8,7 @@ exports.protectRoutes = async (req, res, next) => {
   // 1) check for token in headers and cookies
   if (
     req.headers.authorization &&
-    req.headers.authorization.startswith("Bearer")
+    req.headers.authorization.startsWith("Bearer")
   ) {
     token = req.headers.authorization.split(" ")[1];
   } else if (req.cookies.jwt) {

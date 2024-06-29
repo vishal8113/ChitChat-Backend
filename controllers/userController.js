@@ -87,15 +87,11 @@ exports.getUsers = async (req, res, next) => {
 
   const cnt_user = req.user;
 
-  console.log(cnt_user);
-
   const remaining_users = All_users.filter(
     (user) =>
       !cnt_user.friends.includes(user._id) &&
       user._id.toString() !== cnt_user._id.toString()
   );
-
-  console.log(remaining_users);
 
   return res.status(200).json({
     status: "success",
@@ -117,14 +113,14 @@ exports.getFriendRequests = async (req, res, next) => {
 };
 
 exports.getFriends = async (req, res, next) => {
-  const cnt_user = await User.find(req.user._id).populate(
+  const this_user = await User.findById(req.user._id).populate(
     "friends",
     "_id name imageUrl"
   );
 
   return res.status(200).json({
     status: "success",
-    data: cnt_user.friends,
+    data: this_user.friends,
     message: "Friends fetched successfully",
   });
 };

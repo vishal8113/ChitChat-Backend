@@ -7,7 +7,11 @@ const { protectRoutes } = require("../middlewares/protectRoutes");
 router.put("/editProfile", userController.EditProfile);
 router.post("/removeUser", userController.deleteUserAccount);
 router.get("/getUsers", protectRoutes, userController.getUsers);
-router.get("/getFriends", userController.getFriends);
-router.get("/getFriendRequests", userController.getFriendRequests);
+router.get(
+  "/getFriendRequests",
+  protectRoutes,
+  userController.getFriendRequests
+);
+router.get("/getFriends", protectRoutes, userController.getFriends);
 
 module.exports = router;

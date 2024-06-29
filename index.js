@@ -3,7 +3,9 @@ const express = require("express");
 require("dotenv").config();
 
 const { Server } = require("socket.io");
-const { createServer, request } = require("http");
+const { createServer } = require("http");
+
+const path = require("path");
 
 const app = express();
 
@@ -25,6 +27,7 @@ const cors = require("cors");
 const dbConnect = require("./config/config.js");
 const User = require("./models/user");
 const FriendRequest = require("./models/friendRequest");
+const PersonalChat = require("./models/personalChat");
 
 const port = process.env.PORT || 8000;
 
@@ -80,11 +83,13 @@ io.on("connection", async (socket) => {
   if (Boolean(user_id)) {
     await User.findByIdAndUpdate(user_id, {
       socket_id,
+      status: "Online",
     });
   }
 
   // create friend request
-  socket.on("friend-request", async (data) => {
+  socket.on("friend_request", async (data) => {
+    console.log(data);
     const to = await User.findById(data.to);
     const from = await User.findById(data.from);
 
@@ -95,16 +100,16 @@ io.on("connection", async (socket) => {
 
     // send the friend request
 
-    io.to(to.socket_id).emit("new-friend-request", {
+    io.to(to.socket_id).emit("new_friend_request", {
       message: "New friend request received",
     });
 
-    io.to(from.socket_id).emit("request-sent", {
+    io.to(from.socket_id).emit("request_sent", {
       message: "Friend request sent",
     });
   });
 
-  socket.on("accept-request", async (data) => {
+  socket.on("accept_request", async (data) => {
     const request_doc = await FriendRequest.findById(data.request_id);
 
     const sender = await User.findById(request_doc.sender);
@@ -118,16 +123,65 @@ io.on("connection", async (socket) => {
 
     await FriendRequest.findByIdAndDelete(data.request_id);
 
-    io.to(sender.socket_id).emit("request-accepted", {
+    io.to(sender.socket_id).emit("request_accepted", {
       message: "Request accepted successfully",
     });
 
-    io.to(recipient.socket_id).emit("request-accepted", {
+    io.to(recipient.socket_id).emit("request_accepted", {
       message: "Request accepted successfully",
     });
   });
 
-  socket.on("end", () => {
+  socket.on("getAllPersonalConversations", async ({ user_id }, callback) => {
+    const existing_conversations = await PersonalChat.find({
+      participants: { $all: [user_id] }.populate(
+        "participants",
+        "name imageUrl _id status email"
+      ),
+    });
+
+    callback(existing_conversations);
+  });
+
+  socket.on("start_conversation", async (data) => {
+    const { to, from } = data;
+
+    // check existing conversations
+    const existing_conversation = await PersonalChat.find({
+      participants: { $size: 2, $all: [to, from] }.populate(
+        "participants",
+        "name imageUrl _id status email"
+      ),
+    });
+    // pehle baat ho rkhi ho
+    if (existing_conversation.length > 0) {
+      socket.emit("open_chat_box", existing_conversation[0]);
+    }
+    // first time chat
+    else {
+      let chat = await PersonalChat.create({
+        participants: [to, from],
+      });
+
+      chat = await PersonalChat.findById(chat._id).populate(
+        "participants",
+        "name imageUrl _id status email"
+      );
+
+      socket.emit("start_chat", chat);
+    }
+  });
+
+  socket.on("end", async (data) => {
+    // Find user_id and then set the status to offline
+    if (data.user_id) {
+      await User.findByIdAndUpdate(data.user_id, {
+        status: "Offline",
+      });
+    }
+
+    // TODO => broadcast user disconnected
+
     console.log("Closing the connection...");
     socket.disconnect(0);
   });
@@ -137,8 +191,3 @@ process.on("unhandledRejection", (err) => {
   console.log(err);
   process.exit(1);
 });
-
-// soxket.emit("xyz",{to:id,from:id})
-// soxket.on("xyz",(msg) => {
-//   console.log(msg)
-// })

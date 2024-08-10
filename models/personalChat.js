@@ -19,7 +19,7 @@ const PersonalChatSchema = new mongoose.Schema({
       },
       type: {
         type: String,
-        enum: ["Text", "Media", "Link", "Reply"],
+        enum: ["text", "media", "link", "reply"],
       },
       createdAt: {
         type: Date,
@@ -32,6 +32,6 @@ const PersonalChatSchema = new mongoose.Schema({
   ],
 });
 
-const PersonalChat = new mongoose.Model("PersonalChat", PersonalChatSchema);
+const PersonalChat = new mongoose.model("PersonalChat", PersonalChatSchema);
 
 module.exports = PersonalChat;

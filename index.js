@@ -5,8 +5,6 @@ require("dotenv").config();
 const { Server } = require("socket.io");
 const { createServer } = require("http");
 
-const path = require("path");
-
 const app = express();
 
 const server = createServer(app);
@@ -80,11 +78,15 @@ io.on("connection", async (socket) => {
 
   const socket_id = socket.id;
 
-  if (Boolean(user_id)) {
-    await User.findByIdAndUpdate(user_id, {
-      socket_id,
-      status: "Online",
-    });
+  if (user_id != null && Boolean(user_id)) {
+    try {
+      User.findByIdAndUpdate(user_id, {
+        socket_id,
+        status: "Online",
+      });
+    } catch (e) {
+      console.log(e);
+    }
   }
 
   // create friend request
@@ -133,29 +135,29 @@ io.on("connection", async (socket) => {
   });
 
   socket.on("getAllPersonalConversations", async ({ user_id }, callback) => {
-    const existing_conversations = await PersonalChat.find({
-      participants: { $all: [user_id] }.populate(
-        "participants",
-        "name imageUrl _id status email"
-      ),
-    });
+    try {
+      const existing_conversations = await PersonalChat.find({
+        participants: { $all: [user_id] },
+      }).populate("participants", "name imageUrl _id status email");
 
-    callback(existing_conversations);
+      callback(existing_conversations);
+    } catch (e) {
+      console.log(e);
+    }
   });
 
   socket.on("start_conversation", async (data) => {
     const { to, from } = data;
 
     // check existing conversations
+
     const existing_conversation = await PersonalChat.find({
-      participants: { $size: 2, $all: [to, from] }.populate(
-        "participants",
-        "name imageUrl _id status email"
-      ),
-    });
+      participants: { $size: 2, $all: [to, from] },
+    }).populate("participants", "name imageUrl _id status email");
+
     // pehle baat ho rkhi ho
     if (existing_conversation.length > 0) {
-      socket.emit("open_chat_box", existing_conversation[0]);
+      socket.emit("start_chat", existing_conversation[0]);
     }
     // first time chat
     else {
@@ -170,6 +172,61 @@ io.on("connection", async (socket) => {
 
       socket.emit("start_chat", chat);
     }
+  });
+
+  socket.on("get_messages", async (data, callback) => {
+    try {
+      if (data.conversation_id !== null) {
+        const { messages } = await PersonalChat.findById(
+          data.conversation_id
+        ).select("messages");
+        callback(messages);
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  });
+
+  socket.on("text_message", async (data) => {
+    // Link msg , Text Msg
+    const { message, conversation_id, from, to, type } = data; //from -> id, to -> id
+
+    const to_user = await User.findById(to);
+    const from_user = await User.findById(from);
+
+    const new_message = {
+      to,
+      from,
+      type,
+      created_at: Date.now(),
+      text: message,
+    };
+
+    const chat = await PersonalChat.findById(conversation_id);
+    if (!chat) {
+      console.log("Conversation Id is empty!!!");
+      return;
+    }
+    chat.messages.push(new_message);
+    await chat.save({ new: true, validateModifiedOnly: true });
+
+    // emit incoming message -> to user
+
+    io.to(to_user?.socket_id).emit("new_message", {
+      conversation_id,
+      message: new_message,
+    });
+
+    // emit outgoing_message -> from user
+
+    io.to(from_user?.socket_id).emit("new_message", {
+      conversation_id,
+      message: new_message,
+    });
+  });
+
+  socket.on("file_message", (data) => {
+    // Media Msg (Audio,Video,Document,Image)
   });
 
   socket.on("end", async (data) => {
